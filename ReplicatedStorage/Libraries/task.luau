@@ -11,28 +11,20 @@ local processing = {}
 function task.queue(queueName: string, f: () -> ())
 	assert(typeof(queueName) == "string", "First argument to task.queue must be a string")
 	assert(typeof(f) == "function", "Second argument to task.queue must be a function")
-
 	if not queues[queueName] then
 		queues[queueName] = {}
 	end
-
 	table.insert(queues[queueName], f)
-
-	-- Start processing if not already
 	if not processing[queueName] then
 		processing[queueName] = true
-
-		task.spawn(function()
+		_task.spawn(function()
 			while #queues[queueName] > 0 do
 				local nextFn = table.remove(queues[queueName], 1)
-
 				local success, err = pcall(nextFn)
 				if not success then
-					warn("[task.queue][" .. queueName .. "] Error:", err)
+					error("[task.queue][" .. queueName .. "] Error: ".. err)
 				end
 			end
-
-			-- Auto-cleanup after queue is empty
 			queues[queueName] = nil
 			processing[queueName] = nil
 		end)
