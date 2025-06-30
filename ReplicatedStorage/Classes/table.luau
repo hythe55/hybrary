@@ -1,7 +1,7 @@
 --[[
 Class that provides an enhanced table wrapper with change tracking,
 recursive nesting support, and additional utility methods.
-v2.1 - 6/30/2025 3:18AM
+v2.2 - 6/30/2025 4:08AM
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Signal = require(ReplicatedStorage.Classes.Signal)
@@ -88,7 +88,7 @@ Inserts a value at the end of the table and fires change events.
 function Table:Insert(value: any)
 	assert(self ~= Table, "Method must be called on Table class")
 	assert(value, "wrong number of arguments to 'Insert'")
-	table.insert(self, value)
+	table.insert(self.Raw, value)
 	--self.Changed:Fire(#self, value)
 	self:_fireChangedForParents()
 end
@@ -101,11 +101,11 @@ function Table:Remove(pos: number|string?)
 	pos = pos or #self
 	local oldValue = rawget(self, pos)
 	if not pos or typeof(pos) == "number" then
-		table.remove(self, pos)
-	elseif table.find(self, pos) then
-		table.remove(self, table.find(self, pos))
+		table.remove(self.Raw, pos)
+	elseif table.find(self.Raw, pos) then
+		table.remove(self.Raw, table.find(self, pos))
 	elseif oldValue then
-		rawset(self, pos, nil)
+		rawset(self.Raw, pos, nil)
 	else
 		error(pos.. " not found in Table")
 	end
@@ -127,7 +127,7 @@ Searches for a value in the table and returns its index position.
 ]]
 function Table:Find<V>(needle: V, init: number?): number?
 	assert(self ~= Table, "Method must be called on Table class")
-	return table.find(self, needle, init)
+	return table.find(self.Raw, needle, init)
 end
 
 --[[
@@ -136,6 +136,7 @@ Freezes the table to prevent further modifications.
 function Table:Freeze()
 	assert(self ~= Table, "Method must be called on Table class")
 	table.freeze(self)
+	table.freeze(self.Raw)
 	self.IsFrozen = true
 end
 
@@ -144,7 +145,7 @@ Returns all values from the table as separate return values.
 ]]
 function Table:Unpack(i: number?, j: number?)
 	assert(self ~= Table, "Method must be called on Table class")
-	return table.unpack(self, i, j)
+	return table.unpack(self.Raw, i, j)
 end
 
 --[[
@@ -152,7 +153,7 @@ Moves elements from one part of the table to another position.
 ]]
 function Table:Move(a: number, b: number, t: number, dst: {V}?)
 	assert(self ~= Table, "Method must be called on Table class")
-	return table.move(self, a, b, t, dst)
+	return table.move(self.Raw, a, b, t, dst)
 end
 
 --[[
@@ -160,7 +161,7 @@ Sorts the table elements using an optional comparison function.
 ]]
 function Table:Sort<V>(comp: ((V, V) -> boolean)?)
 	assert(self ~= Table, "Method must be called on Table class")
-	return table.sort(self, comp)
+	return table.sort(self.Raw, comp)
 end
 
 --[[
@@ -168,7 +169,7 @@ Concatenates table elements into a string with optional separator.
 ]]
 function Table:Concact(sep: string?, i: number?, j: number?): string
 	assert(self ~= Table, "Method must be called on Table class")
-	return table.concat(self, sep, i, j)
+	return table.concat(self.Raw, sep, i, j)
 end
 
 --[[
