@@ -1,17 +1,12 @@
 --[[
-v2 - 6/27/2025 2:46AM
-written by hythe55 with some of the metatable stuff taken from xendatro
+Class that provides an enhanced table wrapper with change tracking,
+recursive nesting support, and additional utility methods.
+v2.1 - 6/30/2025 3:18AM
 ]]
-
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Signal = require(ReplicatedStorage.Classes.Signal)
 local table: typeof(require(ReplicatedStorage.Libraries.table)) = require(ReplicatedStorage.Libraries.table)
 local Table = {}
-
---[[
-Changed -> index, value, oldValue
-for now all of these will be nil if :Clear() is called
-]]
 
 export type Table = {
 	Changed: typeof(Signal.new()),
@@ -37,6 +32,9 @@ export type Table = {
 
 local Properties = {}
 
+--[[
+Creates a new instance of the Table class with optional initial data and parent.
+]]
 function Table.new<T>(t: T?, parent: Table?): Table & T
 	local self = {}
 	self.Changed = Signal.new()
@@ -57,9 +55,6 @@ function Table.new<T>(t: T?, parent: Table?): Table & T
 				--self.Changed:Fire()
 				self:_fireChangedForParents()
 			end
-		end,
-		__tonumber = function()
-			print('tonumber')
 		end,
 		__iter = function(t)
 			return next, t.Raw
@@ -87,6 +82,9 @@ function Table.new<T>(t: T?, parent: Table?): Table & T
 	return self
 end
 
+--[[
+Inserts a value at the end of the table and fires change events.
+]]
 function Table:Insert(value: any)
 	assert(self ~= Table, "Method must be called on Table class")
 	assert(value, "wrong number of arguments to 'Insert'")
@@ -95,9 +93,9 @@ function Table:Insert(value: any)
 	self:_fireChangedForParents()
 end
 
---[[When provided with a number behaves like table.remove while firing Table.Changed.
-If no position is provided it will default to #Table.
-If provided with a string it will first attempt to run Table:Find() and if no value is found it will attempt to locate an index with a matching name.]]
+--[[
+Removes an item from the table by position or value and fires change events.
+]]
 function Table:Remove(pos: number|string?)
 	assert(self ~= Table, "Method must be called on Table class")
 	pos = pos or #self
@@ -116,43 +114,66 @@ function Table:Remove(pos: number|string?)
 	self:_fireChangedForParents()
 end
 
+--[[
+Creates a deep copy of the table with all nested tables preserved.
+]]
 function Table:Clone()
 	assert(self ~= Table, "Method must be called on Table class")
 	return Table.new(table.clone(self.Raw))
 end
 
+--[[
+Searches for a value in the table and returns its index position.
+]]
 function Table:Find<V>(needle: V, init: number?): number?
 	assert(self ~= Table, "Method must be called on Table class")
-	return table.find(self)
+	return table.find(self, needle, init)
 end
 
+--[[
+Freezes the table to prevent further modifications.
+]]
 function Table:Freeze()
 	assert(self ~= Table, "Method must be called on Table class")
 	table.freeze(self)
 	self.IsFrozen = true
 end
 
+--[[
+Returns all values from the table as separate return values.
+]]
 function Table:Unpack(i: number?, j: number?)
 	assert(self ~= Table, "Method must be called on Table class")
 	return table.unpack(self, i, j)
 end
 
+--[[
+Moves elements from one part of the table to another position.
+]]
 function Table:Move(a: number, b: number, t: number, dst: {V}?)
 	assert(self ~= Table, "Method must be called on Table class")
 	return table.move(self, a, b, t, dst)
 end
 
+--[[
+Sorts the table elements using an optional comparison function.
+]]
 function Table:Sort<V>(comp: ((V, V) -> boolean)?)
 	assert(self ~= Table, "Method must be called on Table class")
 	return table.sort(self, comp)
 end
 
+--[[
+Concatenates table elements into a string with optional separator.
+]]
 function Table:Concact(sep: string?, i: number?, j: number?): string
 	assert(self ~= Table, "Method must be called on Table class")
 	return table.concat(self, sep, i, j)
 end
 
---Makes the table printable and storable in DataStores.
+--[[
+Converts the table to a plain Lua table for storage or transmission.
+]]
 function Table:Serialize()
 	local function unwrap(value)
 		if typeof(value) == "table" then
@@ -173,12 +194,16 @@ function Table:Serialize()
 	return unwrap(self.Raw)
 end
 
---Returns the raw data stored inside of the Table.
+--[[
+Returns the raw table data without the Table wrapper.
+]]
 function Table:GetEntries()
 	return self.Raw
 end
 
---[[Clears the table.]]
+--[[
+Removes all elements from the table and fires change events.
+]]
 function Table:Clear()
 	assert(self ~= Table, "Method must be called on Table class")
 	table.clear(self.Raw)
@@ -187,7 +212,9 @@ function Table:Clear()
 	self:_fireChangedForParents()
 end
 
---[[Clears the table and its events from memory.]]
+--[[
+Destroys the table instance and cleans up all nested tables and events.
+]]
 function Table:Destroy()
 	assert(self ~= Table, "Method must be called on Table class")
 
