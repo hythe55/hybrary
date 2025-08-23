@@ -17,6 +17,53 @@ local function checkRunContext(isServer: boolean)
 	assert(RunService:IsServer() == isServer, "Method cannot be called from this RunContext")
 end
 
+local Replicator = {}
+Replicator.__index = Replicator
+
+--[[
+Create an internal Replication object
+]]
+function Replicator.new(remoteEvent: RemoteEvent, callback: (data: Table.Table) -> ())
+	local self = setmetatable({}, Replicator)
+
+	self._connection = nil
+	self._callback = callback
+	self._remoteEvent = remoteEvent
+	self._complete = false
+	self._destroyed = false
+
+	self._connection = remoteEvent.OnClientEvent:Connect(function(data)
+		while not self._complete and not self._destroyed do
+			task.wait(0.05)
+		end
+		if self._destroyed then return end
+		data = Table.new(data)
+		self._callback(data)
+	end)
+
+	task.defer(function()
+		local data = ReplicationService:RequestData(remoteEvent)
+		if self._destroyed then return end
+		data = Table.new(data)
+		self._callback(data)
+		self._complete = true
+	end)
+
+	return self
+end
+
+--[[
+Unlistens and cleans up a listener.
+]]
+function Replicator:Unlisten()
+	if self._destroyed then return end
+	self._destroyed = true
+	if self._connection then
+		self._connection:Disconnect()
+		self._connection = nil
+	end
+end
+
 --[[
 Creates a new Replication and fires the RemoteEvent whenever changes to <strong>data</strong> are detected.
 
@@ -26,18 +73,18 @@ function ReplicationService:Create(data: Table.Table, remoteEvent: RemoteEvent, 
 	checkRunContext(true)
 	assert(remoteEvent:IsA("RemoteEvent"), "Argument 1 must be a RemoteEvent")
 	local _p = player
-	
+
 	local player = player or "_ALL"
 	if not Replicators[player] then
 		Replicators[player] = {}
 	end
-	
+
 	if _p then
 		assert(not Replicators[player][remoteEvent], "ReplicationService is already using ".. remoteEvent.Name.. " for ".. player.Name)
 	else
 		assert(not Replicators[player][remoteEvent], "ReplicationService is already using ".. remoteEvent.Name.. " for all players")
 	end
-	
+
 	Replicators[player][remoteEvent] = {}
 	local replicator = Replicators[player][remoteEvent]
 	replicator.Data = data:Serialize()
@@ -50,7 +97,7 @@ function ReplicationService:Create(data: Table.Table, remoteEvent: RemoteEvent, 
 		end
 		remoteEvent:FireClient(player, replicator.Data)
 	end)
-	
+
 	ReplicationService.ReplicationCreated:Fire(remoteEvent)
 end
 
@@ -61,7 +108,7 @@ If no player is provided the Replication will be removed for all players.
 function ReplicationService:Clear(remoteEvent: RemoteEvent, player: Player?)
 	checkRunContext(true)
 	assert(remoteEvent:IsA("RemoteEvent"), "Argument 1 must be a RemoteEvent")
-	
+
 	player = player or "_ALL"
 	if Replicators[player] then
 		if Replicators[player].ChangedConnection then
@@ -77,14 +124,16 @@ Calls the provided function when initally called and for updates to <strong>data
 data.Changed will not fire on data recived from this method.
 The f arguemnt takes a function with the data parameter.
 ]]
-function ReplicationService:Listen(remoteEvent: RemoteEvent, f: (data: Table.Table) -> ())
+function ReplicationService:Listen(remoteEvent: RemoteEvent, callback: (data: Table.Table) -> ())
 	--Remote events wipe metatables
 	checkRunContext(false)
 	assert(remoteEvent:IsA("RemoteEvent"), "Argument 1 must be a RemoteEvent")
-	assert(typeof(f) == "function", "Argument 2 must be a function")
-	
-	local complete = false
-	
+	assert(typeof(callback) == "function", "Argument 2 must be a function")
+
+	return Replicator.new(remoteEvent, callback)
+
+	--[[local complete = false
+
 	remoteEvent.OnClientEvent:Connect(function(data)
 		while not complete do
 			task.wait(0.05)
@@ -97,7 +146,7 @@ function ReplicationService:Listen(remoteEvent: RemoteEvent, f: (data: Table.Tab
 		data = Table.new(data)
 		f(data)
 		complete = true
-	end)
+	end)]]
 end
 
 --[[
@@ -113,7 +162,7 @@ end
 if RunService:IsServer() then
 	local function requestData(player, remoteEvent: RemoteEvent)
 		assert(typeof(remoteEvent == "Instance") or remoteEvent:IsA("RemoteEvent"))
-		
+
 		while true do
 			if Replicators[player] and Replicators[player][remoteEvent] then
 				return Replicators[player][remoteEvent].Data
@@ -123,12 +172,12 @@ if RunService:IsServer() then
 			ReplicationService.ReplicationCreated:Wait()
 		end
 	end
-	
+
 	script.RequestData.OnServerInvoke = function(player, remoteEvent: RemoteEvent)
 		local data = requestData(player, remoteEvent)
 		return data
 	end
-	
+
 	Players.PlayerRemoving:Connect(function(player)
 		if Replicators[player] then
 			if Replicators[player].ChangedConnection then
