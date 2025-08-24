@@ -1,7 +1,7 @@
 --[[
 Class that provides an enhanced table wrapper with change tracking,
 recursive nesting support, and additional utility methods.
-v2.2 - 6/30/2025 4:08AM
+v2.3 - 8/23/2025 11:29PM
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Signal = require(ReplicatedStorage.Classes.Signal)
@@ -211,6 +211,24 @@ function Table:Clear()
 	table.clear(self)
 	--self.Changed:Fire()
 	self:_fireChangedForParents()
+end
+
+--[[
+Disconnects all connections of the Table and returns it to a raw table.
+]]
+function Table:ClearConnections()
+	assert(self ~= Table, "Method must be called on Table class")
+
+	local function loop(t)
+		for i,v in t do
+			if typeof(v) == "table" then
+				loop(v)
+			elseif typeof(t) == "Instance" then
+				t:Destroy()
+			end
+		end
+	end
+	loop(self)
 end
 
 --[[
