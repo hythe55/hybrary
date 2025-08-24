@@ -150,40 +150,33 @@ function DataSaveService:BindToOrderedDataStore(index: string, name: string, sco
 		local previous = profile
 		local currentLocation = profile.Data
 		for i,v in string.split(index, ".") do
-			print(currentLocation, v, currentLocation[v])
 			if currentLocation[v] then
 				previous = currentLocation
 				currentLocation = currentLocation[v]
 				continue
 			end
 		end
-		print(currentLocation)
 		return previous
 	end
 	
 	local function getData(profile: Profile)
 		local currentLocation = profile.Data
 		for i,v in string.split(index, ".") do
-			print(currentLocation, v, currentLocation[v])
 			if currentLocation[v] then
 				currentLocation = currentLocation[v]
 				continue
 			end
 		end
-		print(currentLocation)
 		return currentLocation
 	end
 	
 	local function update(player: Player)
-		print('checking for updates')
 		local profile = DataSaveService:GetProfile(player)
 		getIndex(profile).Changed:Connect(function()
-			print('changed')
-		--profile.Data[index].Changed:Connect(function()
 			local data = getData(profile)
 			task.wait(ORDERED_DATA_UPDATE_INTERVAL)
 			if not player then return end
-			if data == getData(profile) then
+			if data ~= getData(profile) then
 				local success, err
 				local tries = 0
 				repeat
